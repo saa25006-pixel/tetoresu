@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>和モダン落とし物 - 伝統テトリス</title>
+    <title>和モダン落とし物 - 伝統テトリス（二重試練編）</title>
     <style>
         /* 全体の和風モダンなスタイル設定 */
         body {
@@ -11,7 +11,7 @@
                 linear-gradient(rgba(40, 40, 45, 0.3) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(40, 40, 45, 0.3) 1px, transparent 1px);
             background-size: 20px 20px; /* ほのかな格子戸・障子風の背景 */
-            color: #f7f6f2; /* 胡粉色（ごふんいろ・温かみのある白） */
+            color: #f7f6f2; /* 胡粉色（ごふんいろ） */
             font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif; /* 和を醸し出す明朝体 */
             display: flex;
             justify-content: center;
@@ -33,38 +33,72 @@
             position: relative;
         }
 
+        /* ゲーム盤面の親要素（濃霧エフェクトを重ねるため） */
+        .board-wrapper {
+            position: relative;
+        }
+
         /* ゲーム盤面 */
         #board {
             border: 4px solid #6b2c24; /* 漆器のような深い赤（べにいろ）の枠 */
             background-color: #161618; /* 盤面内部はさらに濃い漆黒 */
             box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+            display: block;
+        }
+
+        /* 【新規】盤面の一部を隠す「濃霧（のうむ）」エフェクト */
+        #fog-overlay {
+            position: absolute;
+            top: 120px; /* 盤面の中央付近を隠す設定 */
+            left: 4px;  /* 枠線の内側に合わせる */
+            width: 240px;
+            height: 140px;
+            /* じんわりと中心が濃い墨汁・霧のようなグラデーション */
+            background: radial-gradient(circle, rgba(20, 20, 22, 0.98) 30%, rgba(20, 20, 22, 0.8) 70%, transparent 100%);
+            opacity: 0; /* 初期状態は透明 */
+            transition: opacity 1.5s ease-in-out; /* 霧がじわっと現れる演出 */
+            pointer-events: none; /* 背後の操作を邪魔しない */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 濃霧の中の不気味な警告文字 */
+        #fog-text {
+            color: #c94a59;
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 4px;
+            text-shadow: 0 0 8px rgba(0,0,0,1);
+            opacity: 0;
+            transition: opacity 1s;
         }
 
         /* サイドパネル（情報表示） */
         .side-panel {
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            min-width: 140px;
+            gap: 15px;
+            min-width: 150px;
         }
 
         /* 短冊・絵馬をイメージした情報ボックス */
         .info-box {
             background: linear-gradient(135deg, #242428, #1c1c1f);
             border-left: 5px solid #d4b16a; /* 金色の縦帯 */
-            padding: 12px 15px;
+            padding: 10px 15px;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
         }
 
         .info-title {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #bfa46f; /* 鈍い金（にぶがね） */
-            margin-bottom: 5px;
-            letter-spacing: 2px;
+            margin-bottom: 3px;
+            letter-spacing: 1px;
         }
 
         .info-value {
-            font-size: 1.6rem;
+            font-size: 1.5rem;
             font-weight: bold;
             text-align: right;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
@@ -79,14 +113,14 @@
 
         /* 操作説明 */
         .controls {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: #a09e9b;
-            line-height: 1.6;
+            line-height: 1.5;
             border-top: 1px dashed #4a4a50;
-            padding-top: 10px;
+            padding-top: 8px;
         }
 
-        /* ゲームオーバー時の桜舞い散るオーバーレイ */
+        /* ゲームオーバー画面 */
         #game-over-screen {
             display: none;
             position: absolute;
@@ -129,7 +163,10 @@
 <body>
 
 <div class="game-container">
-    <canvas id="board" width="240" height="480"></canvas>
+    <div class="board-wrapper">
+        <canvas id="board" width="240" height="480"></canvas>
+        <div id="fog-overlay"><span id="fog-text">濃霧襲来</span></div>
+    </div>
 
     <div class="side-panel">
         <div class="info-box">
@@ -141,15 +178,21 @@
             <div id="lines" class="info-value">0</div>
         </div>
         <div class="info-box">
+            <div class="info-title">地響（次回石段）</div>
+            <div id="garbage-countdown" class="info-value" style="color: #d4b16a;">5</div>
+        </div>
+        <div class="info-box">
+            <div class="info-title">気象（霧の状態）</div>
+            <div id="weather-status" class="info-value" style="color: #a09e9b; font-size: 1.1rem;">平穏</div>
+        </div>
+        <div class="info-box">
             <div class="info-title">次手</div>
             <canvas id="next-canvas" width="96" height="96"></canvas>
         </div>
         <div class="controls">
-            【操作方】<br>
-            ・矢印 左/右 ： 移動<br>
-            ・矢印 上 ： 右回転<br>
-            ・矢印 下 ： 軟落下<br>
-            ・空間（Space）：硬落下
+            【操作方】 矢印キーで移動・回転<br>
+            【試練一】 5手毎に底から石段上昇<br>
+            <span style="color: #c94a59; font-weight: bold;">【試練二】 15秒毎に「濃霧」が発生。盤面中央の視界が完全に遮られます！</span>
         </div>
     </div>
 
@@ -168,29 +211,22 @@
 
     const ROW = 20;
     const COL = 10;
-    const SQ = 24; // 1マスのサイズ
-    const VACANT = "#161618"; // 空白マスの色
+    const SQ = 24; 
+    const VACANT = "#161618"; 
+    const GARBAGE_COLOR = "#5a5856"; // 鈍色（にびいろ）
 
-    // 日本の伝統色（和の色）マップ
     const COLORS = {
-        I: "#c94a59", // 茜色（あかねいろ）- 赤
-        J: "#2b5f75", // 縹色（はなだいろ）- 藍・青
-        L: "#d98032", // 琥珀色（こはくいろ）- 橙
-        O: "#bfa46f", // 黄金（こがね）- 黄
-        S: "#5c8a66", // 萌黄色（もえぎいろ）- 緑
-        T: "#6f5175", // 江戸紫（えどむらさき）- 紫
-        Z: "#af3429"  // 紅緋（べにひ）- 鮮やかな赤
+        I: "#c94a59", J: "#2b5f75", L: "#d98032", O: "#bfa46f", S: "#5c8a66", T: "#6f5175", Z: "#af3429"
     };
 
-    // テトリミノの形状定義
     const PIECES = [
-        [ [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]], [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], [[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]], [[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]] ], // I
-        [ [[1,0,0],[1,1,1],[0,0,0]], [[0,1,1],[0,1,0],[0,1,0]], [[0,0,0],[1,1,1],[0,0,1]], [[0,1,0],[0,1,0],[1,1,0]] ], // J
-        [ [[0,0,1],[1,1,1],[0,0,0]], [[0,1,0],[0,1,0],[0,1,1]], [[0,0,0],[1,1,1],[1,0,0]], [[1,1,0],[0,1,0],[0,1,0]] ], // L
-        [ [[1,1],[1,1]] ], // O
-        [ [[0,1,1],[1,1,0],[0,0,0]], [[0,1,0],[0,1,1],[0,0,1]], [[0,0,0],[0,1,1],[1,1,0]], [[1,0,0],[1,1,0],[0,1,0]] ], // S
-        [ [[0,1,0],[1,1,1],[0,0,0]], [[0,1,0],[0,1,1],[0,1,0]], [[0,0,0],[1,1,1],[0,1,0]], [[0,1,0],[1,1,0],[0,1,0]] ], // T
-        [ [[1,1,0],[0,1,1],[0,0,0]], [[0,0,1],[0,1,1],[0,1,0]], [[0,0,0],[1,1,0],[0,1,1]], [[0,1,0],[1,1,0],[1,0,0]] ]  // Z
+        [ [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]], [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], [[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]], [[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]] ],
+        [ [[1,0,0],[1,1,1],[0,0,0]], [[0,1,1],[0,1,0],[0,1,0]], [[0,0,0],[1,1,1],[0,0,1]], [[0,1,0],[0,1,0],[1,1,0]] ],
+        [ [[0,0,1],[1,1,1],[0,0,0]], [[0,1,0],[0,1,0],[0,1,1]], [[0,0,0],[1,1,1],[1,0,0]], [[1,1,0],[0,1,0],[0,1,0]] ],
+        [ [[1,1],[1,1]] ],
+        [ [[0,1,1],[1,1,0],[0,0,0]], [[0,1,0],[0,1,1],[0,0,1]], [[0,0,0],[0,1,1],[1,1,0]], [[1,0,0],[1,1,0],[0,1,0]] ],
+        [ [[0,1,0],[1,1,1],[0,0,0]], [[0,1,0],[0,1,1],[0,1,0]], [[0,0,0],[1,1,1],[0,1,0]], [[0,1,0],[1,1,0],[0,1,0]] ],
+        [ [[1,1,0],[0,1,1],[0,0,0]], [[0,0,1],[0,1,1],[0,1,0]], [[0,0,0],[1,1,0],[0,1,1]], [[0,1,0],[1,1,0],[1,0,0]] ]
     ];
 
     const TYPES = ['I','J','L','O','S','T','Z'];
@@ -200,7 +236,13 @@
     let lines = 0;
     let gameOver = false;
     let dropStart = Date.now();
-    let speed = 800; // 落下速度(ms)
+    let speed = 800; 
+
+    let pieceCount = 0;
+    const GARBAGE_INTERVAL = 5; 
+
+    // 【新規】濃霧（目隠し）用のタイマー管理
+    let fogTimer = null;
 
     // 盤面の初期化
     for(let r = 0; r < ROW; r++){
@@ -210,23 +252,25 @@
         }
     }
 
-    // マスの描画（畳の目や光沢を意識した和モダンデザイン）
     function drawSquare(x, y, color, context = ctx) {
         context.fillStyle = color;
         context.fillRect(x*SQ, y*SQ, SQ, SQ);
 
         if(color !== VACANT) {
-            // ブロックの枠線（少し暗い金/茶で和の風合いを）
             context.strokeStyle = "rgba(40, 30, 15, 0.5)";
             context.lineWidth = 1;
             context.strokeRect(x*SQ, y*SQ, SQ, SQ);
 
-            // インナーシャドウ（立体感とガラスのような上品さの演出）
-            context.fillStyle = "rgba(255, 255, 255, 0.15)";
-            context.fillRect(x*SQ + 2, y*SQ + 2, SQ - 4, 3);
-            context.fillRect(x*SQ + 2, y*SQ + 2, 3, SQ - 4);
+            if (color === GARBAGE_COLOR) {
+                context.fillStyle = "rgba(0, 0, 0, 0.2)";
+                context.fillRect(x*SQ + 2, y*SQ + SQ - 5, SQ - 4, 3);
+                context.fillRect(x*SQ + SQ - 5, y*SQ + 2, 3, SQ - 4);
+            } else {
+                context.fillStyle = "rgba(255, 255, 255, 0.15)";
+                context.fillRect(x*SQ + 2, y*SQ + 2, SQ - 4, 3);
+                context.fillRect(x*SQ + 2, y*SQ + 2, 3, SQ - 4);
+            }
         } else {
-            // 背景の薄いガイドライン
             context.strokeStyle = "#222225";
             context.lineWidth = 0.5;
             context.strokeRect(x*SQ, y*SQ, SQ, SQ);
@@ -241,13 +285,12 @@
         }
     }
 
-    // テトリミノ（塊）のオブジェクト
     class Piece {
         constructor(tetromino, color, type) {
             this.tetromino = tetromino;
             this.color = color;
             this.type = type;
-            this.tetrominoN = 0; // 最初の回転状態
+            this.tetrominoN = 0;
             this.activeTetromino = this.tetromino[this.tetrominoN];
             this.x = 3;
             this.y = -2;
@@ -340,14 +383,13 @@
                 for(let c = 0; c < this.activeTetromino[r].length; c++){
                     if(!this.activeTetromino[r][c]){ continue; }
                     if(this.y + r < 0){
-                        gameOver = true;
-                        document.getElementById('game-over-screen').style.display = 'flex';
+                        triggerGameOver();
                         return;
                     }
                     board[this.y + r][this.x + c] = this.color;
                 }
             }
-            // 行の消去処理
+
             let linesClearedThisTurn = 0;
             for(let r = 0; r < ROW; r++){
                 let isRowFull = true;
@@ -365,18 +407,83 @@
             
             if(linesClearedThisTurn > 0) {
                 lines += linesClearedThisTurn;
-                score += linesClearedThisTurn * 100 * linesClearedThisTurn; // 連続消去で高得点
+                score += linesClearedThisTurn * 100 * linesClearedThisTurn;
                 document.getElementById('score').innerText = score;
                 document.getElementById('lines').innerText = lines;
-                
-                // 速度上昇（レベルアップ要素）
                 speed = Math.max(200, 800 - (lines * 20));
             }
+
+            pieceCount++;
+            let countdown = GARBAGE_INTERVAL - (pieceCount % GARBAGE_INTERVAL);
+            if(countdown === GARBAGE_INTERVAL) {
+                addGarbageLine();
+                document.getElementById('garbage-countdown').innerText = GARBAGE_INTERVAL;
+            } else {
+                document.getElementById('garbage-countdown').innerText = countdown;
+            }
+
             drawBoard();
         }
     }
 
-    // ランダムなブロック生成
+    function addGarbageLine() {
+        if(gameOver) return;
+        for(let c = 0; c < COL; c++) {
+            if(board[0][c] !== VACANT) {
+                triggerGameOver();
+                return;
+            }
+        }
+        for(let r = 0; r < ROW - 1; r++) {
+            board[r] = [...board[r+1]];
+        }
+        let emptyHole = Math.floor(Math.random() * COL);
+        board[ROW-1] = [];
+        for(let c = 0; c < COL; c++) {
+            if(c === emptyHole) {
+                board[ROW-1][c] = VACANT;
+            } else {
+                board[ROW-1][c] = GARBAGE_COLOR;
+            }
+        }
+    }
+
+    /* 【新規】濃霧の発生・消去をループ制御する関数 */
+    function startFogCycle() {
+        if(gameOver) return;
+        
+        // 15秒ごとに霧が発生するか判定するループ
+        fogTimer = setInterval(() => {
+            if(gameOver) { clearInterval(fogTimer); return; }
+
+            const fogOverlay = document.getElementById('fog-overlay');
+            const fogText = document.getElementById('fog-text');
+            const weatherStatus = document.getElementById('weather-status');
+
+            // 濃霧発生
+            weatherStatus.innerText = "濃霧";
+            weatherStatus.style.color = "#c94a59";
+            fogOverlay.style.opacity = "1";
+            fogText.style.opacity = "1";
+
+            // 7秒後に霧が晴れる
+            setTimeout(() => {
+                if(gameOver) return;
+                weatherStatus.innerText = "平穏";
+                weatherStatus.style.color = "#a09e9b";
+                fogOverlay.style.opacity = "0";
+                fogText.style.opacity = "0";
+            }, 7000);
+
+        }, 15000); // 15秒サイクル
+    }
+
+    function triggerGameOver() {
+        gameOver = true;
+        clearInterval(fogTimer); // タイマー停止
+        document.getElementById('game-over-screen').style.display = 'flex';
+    }
+
     function randomPiece() {
         let r = Math.floor(Math.random() * PIECES.length);
         return new Piece(PIECES[r], COLORS[TYPES[r]], TYPES[r]);
@@ -391,18 +498,18 @@
         p = nextP;
         nextP = randomPiece();
         drawNextPiece();
+        if(p.collision(0, 0, p.activeTetromino)) {
+            triggerGameOver();
+            return;
+        }
         p.draw();
     }
 
-    // 次手のプレビュー描画
     function drawNextPiece() {
         nextCtx.fillStyle = VACANT;
         nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
-        
-        // Next画面の中央に配置するための補正
         let offsetX = nextP.type === 'O' ? 1 : 0.5;
         let offsetY = nextP.type === 'I' ? 0.5 : 1;
-        
         for(let r = 0; r < nextP.activeTetromino.length; r++){
             for(let c = 0; c < nextP.activeTetromino[r].length; c++){
                 if(nextP.activeTetromino[r][c]){
@@ -412,7 +519,6 @@
         }
     }
 
-    // 操作権限（キー入力イベント）
     document.addEventListener("keydown", CONTROL);
     function CONTROL(event){
         if(gameOver) return;
@@ -423,7 +529,6 @@
         else if(event.keyCode == 32){ p.hardDrop(); event.preventDefault(); }
     }
 
-    // 自動落下のメインループ
     function drop(){
         let now = Date.now();
         let delta = now - dropStart;
@@ -436,13 +541,15 @@
         }
     }
 
-    // 初期戦闘開始
+    // 初回戦闘開始
     drawBoard();
     p.draw();
     drop();
+    startFogCycle(); // 濃霧の試練、始動
 
-    // 再戦（初期化）ロジック
+    // 再戦（初期化）
     function resetGame() {
+        clearInterval(fogTimer);
         board = [];
         for(let r = 0; r < ROW; r++){
             board[r] = [];
@@ -453,9 +560,21 @@
         score = 0;
         lines = 0;
         speed = 800;
+        pieceCount = 0;
         gameOver = false;
+        
+        // 霧の表示リセット
+        const fogOverlay = document.getElementById('fog-overlay');
+        const fogText = document.getElementById('fog-text');
+        const weatherStatus = document.getElementById('weather-status');
+        fogOverlay.style.opacity = "0";
+        fogText.style.opacity = "0";
+        weatherStatus.innerText = "平穏";
+        weatherStatus.style.color = "#a09e9b";
+
         document.getElementById('score').innerText = score;
         document.getElementById('lines').innerText = lines;
+        document.getElementById('garbage-countdown').innerText = GARBAGE_INTERVAL;
         document.getElementById('game-over-screen').style.display = 'none';
         
         drawBoard();
@@ -465,8 +584,11 @@
         p.draw();
         dropStart = Date.now();
         drop();
+        startFogCycle();
     }
 </script>
 
 </body>
 </html>
+🌫️ 新たに追加された「濃霧（目隠し）」のポイント
+15秒ごとに発生する濃霧: ゲーム開始から
