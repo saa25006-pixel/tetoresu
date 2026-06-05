@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>和モダン落とし物 - 伝統テトリス</title>
+    <style>
+        /* 全体の和風モダンなスタイル設定 */
+        body {
+            background-color: #1c1c1f; /* 漆黒（しっこく）をイメージした深い闇 */
+            background-image: 
+                linear-gradient(rgba(40, 40, 45, 0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(40, 40, 45, 0.3) 1px, transparent 1px);
+            background-size: 20px 20px; /* ほのかな格子戸・障子風の背景 */
+            color: #f7f6f2; /* 胡粉色（ごふんいろ・温かみのある白） */
+            font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif; /* 和を醸し出す明朝体 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .game-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 30px;
+            background: rgba(28, 28, 31, 0.85);
+            padding: 30px;
+            border: 3px double #d4b16a; /* 落ち着いた金箔をイメージした二重線 */
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+            position: relative;
+        }
+
+        /* ゲーム盤面 */
+        #board {
+            border: 4px solid #6b2c24; /* 漆器のような深い赤（べにいろ）の枠 */
+            background-color: #161618; /* 盤面内部はさらに濃い漆黒 */
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        /* サイドパネル（情報表示） */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 140px;
+        }
+
+        /* 短冊・絵馬をイメージした情報ボックス */
+        .info-box {
+            background: linear-gradient(135deg, #242428, #1c1c1f);
+            border-left: 5px solid #d4b16a; /* 金色の縦帯 */
+            padding: 12px 15px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .info-title {
+            font-size: 0.9rem;
+            color: #bfa46f; /* 鈍い金（にぶがね） */
+            margin-bottom: 5px;
+            letter-spacing: 2px;
+        }
+
+        .info-value {
+            font-size: 1.6rem;
+            font-weight: bold;
+            text-align: right;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* 次手（Next）の表示エリア */
+        #next-canvas {
+            background-color: #161618;
+            border: 1px solid #4a4a50;
+            margin-top: 5px;
+        }
+
+        /* 操作説明 */
+        .controls {
+            font-size: 0.8rem;
+            color: #a09e9b;
+            line-height: 1.6;
+            border-top: 1px dashed #4a4a50;
+            padding-top: 10px;
+        }
+
+        /* ゲームオーバー時の桜舞い散るオーバーレイ */
+        #game-over-screen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(20, 20, 22, 0.9);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #game-over-screen h2 {
+            color: #c94a59; /* 艶やかな紅（くれない） */
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+        }
+
+        #start-btn {
+            background-color: #6b2c24;
+            color: #f7f6f2;
+            border: 1px solid #d4b16a;
+            padding: 10px 25px;
+            font-family: inherit;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.3);
+        }
+
+        #start-btn:hover {
+            background-color: #8c3b30;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <canvas id="board" width="240" height="480"></canvas>
+
+    <div class="side-panel">
+        <div class="info-box">
+            <div class="info-title">得点</div>
+            <div id="score" class="info-value">0</div>
+        </div>
+        <div class="info-box">
+            <div class="info-title">消去数</div>
+            <div id="lines" class="info-value">0</div>
+        </div>
+        <div class="info-box">
+            <div class="info-title">次手</div>
+            <canvas id="next-canvas" width="96" height="96"></canvas>
+        </div>
+        <div class="controls">
+            【操作方】<br>
+            ・矢印 左/右 ： 移動<br>
+            ・矢印 上 ： 右回転<br>
+            ・矢印 下 ： 軟落下<br>
+            ・空間（Space）：硬落下
+        </div>
+    </div>
+
+    <div id="game-over-screen">
+        <h2>勝負あり</h2>
+        <p style="color: #bfa46f; margin-bottom: 20px;">形勢不利、此処までです。</p>
+        <button id="start-btn" onclick="resetGame()">再戦する</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+    const nextCanvas = document.getElementById('next-canvas');
+    const nextCtx = nextCanvas.getContext('2d');
+
+    const ROW = 20;
+    const COL = 10;
+    const SQ = 24; // 1マスのサイズ
+    const VACANT = "#161618"; // 空白マスの色
+
+    // 日本の伝統色（和の色）マップ
+    const COLORS = {
+        I: "#c94a59", // 茜色（あかねいろ）- 赤
+        J: "#2b5f75", // 縹色（はなだいろ）- 藍・青
+        L: "#d98032", // 琥珀色（こはくいろ）- 橙
+        O: "#bfa46f", // 黄金（こがね）- 黄
+        S: "#5c8a66", // 萌黄色（もえぎいろ）- 緑
+        T: "#6f5175", // 江戸紫（えどむらさき）- 紫
+        Z: "#af3429"  // 紅緋（べにひ）- 鮮やかな赤
+    };
+
+    // テトリミノの形状定義
+    const PIECES = [
+        [ [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]], [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], [[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]], [[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]] ], // I
+        [ [[1,0,0],[1,1,1],[0,0,0]], [[0,1,1],[0,1,0],[0,1,0]], [[0,0,0],[1,1,1],[0,0,1]], [[0,1,0],[0,1,0],[1,1,0]] ], // J
+        [ [[0,0,1],[1,1,1],[0,0,0]], [[0,1,0],[0,1,0],[0,1,1]], [[0,0,0],[1,1,1],[1,0,0]], [[1,1,0],[0,1,0],[0,1,0]] ], // L
+        [ [[1,1],[1,1]] ], // O
+        [ [[0,1,1],[1,1,0],[0,0,0]], [[0,1,0],[0,1,1],[0,0,1]], [[0,0,0],[0,1,1],[1,1,0]], [[1,0,0],[1,1,0],[0,1,0]] ], // S
+        [ [[0,1,0],[1,1,1],[0,0,0]], [[0,1,0],[0,1,1],[0,1,0]], [[0,0,0],[1,1,1],[0,1,0]], [[0,1,0],[1,1,0],[0,1,0]] ], // T
+        [ [[1,1,0],[0,1,1],[0,0,0]], [[0,0,1],[0,1,1],[0,1,0]], [[0,0,0],[1,1,0],[0,1,1]], [[0,1,0],[1,1,0],[1,0,0]] ]  // Z
+    ];
+
+    const TYPES = ['I','J','L','O','S','T','Z'];
+
+    let board = [];
+    let score = 0;
+    let lines = 0;
+    let gameOver = false;
+    let dropStart = Date.now();
+    let speed = 800; // 落下速度(ms)
+
+    // 盤面の初期化
+    for(let r = 0; r < ROW; r++){
+        board[r] = [];
+        for(let c = 0; c < COL; c++){
+            board[r][c] = VACANT;
+        }
+    }
+
+    // マスの描画（畳の目や光沢を意識した和モダンデザイン）
+    function drawSquare(x, y, color, context = ctx) {
+        context.fillStyle = color;
+        context.fillRect(x*SQ, y*SQ, SQ, SQ);
+
+        if(color !== VACANT) {
+            // ブロックの枠線（少し暗い金/茶で和の風合いを）
+            context.strokeStyle = "rgba(40, 30, 15, 0.5)";
+            context.lineWidth = 1;
+            context.strokeRect(x*SQ, y*SQ, SQ, SQ);
+
+            // インナーシャドウ（立体感とガラスのような上品さの演出）
+            context.fillStyle = "rgba(255, 255, 255, 0.15)";
+            context.fillRect(x*SQ + 2, y*SQ + 2, SQ - 4, 3);
+            context.fillRect(x*SQ + 2, y*SQ + 2, 3, SQ - 4);
+        } else {
+            // 背景の薄いガイドライン
+            context.strokeStyle = "#222225";
+            context.lineWidth = 0.5;
+            context.strokeRect(x*SQ, y*SQ, SQ, SQ);
+        }
+    }
+
+    function drawBoard(){
+        for(let r = 0; r < ROW; r++){
+            for(let c = 0; c < COL; c++){
+                drawSquare(c, r, board[r][c]);
+            }
+        }
+    }
+
+    // テトリミノ（塊）のオブジェクト
+    class Piece {
+        constructor(tetromino, color, type) {
+            this.tetromino = tetromino;
+            this.color = color;
+            this.type = type;
+            this.tetrominoN = 0; // 最初の回転状態
+            this.activeTetromino = this.tetromino[this.tetrominoN];
+            this.x = 3;
+            this.y = -2;
+        }
+
+        fill(color, context = ctx, offsetX = 0, offsetY = 0) {
+            for(let r = 0; r < this.activeTetromino.length; r++){
+                for(let c = 0; c < this.activeTetromino[r].length; c++){
+                    if(this.activeTetromino[r][c]){
+                        drawSquare(this.x + c + offsetX, this.y + r + offsetY, color, context);
+                    }
+                }
+            }
+        }
+
+        draw() { this.fill(this.color); }
+        unDraw() { this.fill(VACANT); }
+
+        moveDown() {
+            if(!this.collision(0, 1, this.activeTetromino)){
+                this.unDraw();
+                this.y++;
+                this.draw();
+            } else {
+                this.lock();
+                generateNextPiece();
+            }
+        }
+
+        moveRight() {
+            if(!this.collision(1, 0, this.activeTetromino)){
+                this.unDraw();
+                this.x++;
+                this.draw();
+            }
+        }
+
+        moveLeft() {
+            if(!this.collision(-1, 0, this.activeTetromino)){
+                this.unDraw();
+                this.x--;
+                this.draw();
+            }
+        }
+
+        rotate() {
+            let nextPattern = this.tetromino[(this.tetrominoN + 1) % this.tetromino.length];
+            let kick = 0;
+
+            if(this.collision(0, 0, nextPattern)){
+                if(this.x > COL/2) { kick = -1; } else { kick = 1; }
+            }
+
+            if(!this.collision(kick, 0, nextPattern)){
+                this.unDraw();
+                this.x += kick;
+                this.tetrominoN = (this.tetrominoN + 1) % this.tetromino.length;
+                this.activeTetromino = this.tetromino[this.tetrominoN];
+                this.draw();
+            }
+        }
+
+        hardDrop() {
+            this.unDraw();
+            while(!this.collision(0, 1, this.activeTetromino)) {
+                this.y++;
+            }
+            this.draw();
+            this.lock();
+            generateNextPiece();
+        }
+
+        collision(x, y, piece) {
+            for(let r = 0; r < piece.length; r++){
+                for(let c = 0; c < piece[r].length; c++){
+                    if(!piece[r][c]){ continue; }
+                    let newX = this.x + c + x;
+                    let newY = this.y + r + y;
+
+                    if(newX < 0 || newX >= COL || newY >= ROW){ return true; }
+                    if(newY < 0){ continue; }
+                    if(board[newY][newX] !== VACANT){ return true; }
+                }
+            }
+            return false;
+        }
+
+        lock() {
+            for(let r = 0; r < this.activeTetromino.length; r++){
+                for(let c = 0; c < this.activeTetromino[r].length; c++){
+                    if(!this.activeTetromino[r][c]){ continue; }
+                    if(this.y + r < 0){
+                        gameOver = true;
+                        document.getElementById('game-over-screen').style.display = 'flex';
+                        return;
+                    }
+                    board[this.y + r][this.x + c] = this.color;
+                }
+            }
+            // 行の消去処理
+            let linesClearedThisTurn = 0;
+            for(let r = 0; r < ROW; r++){
+                let isRowFull = true;
+                for(let c = 0; c < COL; c++){
+                    if(board[r][c] === VACANT){ isRowFull = false; break; }
+                }
+                if(isRowFull){
+                    for(let y = r; y > 1; y--){
+                        board[y] = [...board[y-1]];
+                    }
+                    for(let c = 0; c < COL; c++){ board[0][c] = VACANT; }
+                    linesClearedThisTurn++;
+                }
+            }
+            
+            if(linesClearedThisTurn > 0) {
+                lines += linesClearedThisTurn;
+                score += linesClearedThisTurn * 100 * linesClearedThisTurn; // 連続消去で高得点
+                document.getElementById('score').innerText = score;
+                document.getElementById('lines').innerText = lines;
+                
+                // 速度上昇（レベルアップ要素）
+                speed = Math.max(200, 800 - (lines * 20));
+            }
+            drawBoard();
+        }
+    }
+
+    // ランダムなブロック生成
+    function randomPiece() {
+        let r = Math.floor(Math.random() * PIECES.length);
+        return new Piece(PIECES[r], COLORS[TYPES[r]], TYPES[r]);
+    }
+
+    let p = randomPiece();
+    let nextP = randomPiece();
+    drawNextPiece();
+
+    function generateNextPiece() {
+        if(gameOver) return;
+        p = nextP;
+        nextP = randomPiece();
+        drawNextPiece();
+        p.draw();
+    }
+
+    // 次手のプレビュー描画
+    function drawNextPiece() {
+        nextCtx.fillStyle = VACANT;
+        nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+        
+        // Next画面の中央に配置するための補正
+        let offsetX = nextP.type === 'O' ? 1 : 0.5;
+        let offsetY = nextP.type === 'I' ? 0.5 : 1;
+        
+        for(let r = 0; r < nextP.activeTetromino.length; r++){
+            for(let c = 0; c < nextP.activeTetromino[r].length; c++){
+                if(nextP.activeTetromino[r][c]){
+                    drawSquare(c + offsetX, r + offsetY, nextP.color, nextCtx);
+                }
+            }
+        }
+    }
+
+    // 操作権限（キー入力イベント）
+    document.addEventListener("keydown", CONTROL);
+    function CONTROL(event){
+        if(gameOver) return;
+        if(event.keyCode == 37){ p.moveLeft(); dropStart = Date.now(); }
+        else if(event.keyCode == 38){ p.rotate(); dropStart = Date.now(); }
+        else if(event.keyCode == 39){ p.moveRight(); dropStart = Date.now(); }
+        else if(event.keyCode == 40){ p.moveDown(); }
+        else if(event.keyCode == 32){ p.hardDrop(); event.preventDefault(); }
+    }
+
+    // 自動落下のメインループ
+    function drop(){
+        let now = Date.now();
+        let delta = now - dropStart;
+        if(delta > speed){
+            p.moveDown();
+            dropStart = Date.now();
+        }
+        if(!gameOver){
+            requestAnimationFrame(drop);
+        }
+    }
+
+    // 初期戦闘開始
+    drawBoard();
+    p.draw();
+    drop();
+
+    // 再戦（初期化）ロジック
+    function resetGame() {
+        board = [];
+        for(let r = 0; r < ROW; r++){
+            board[r] = [];
+            for(let c = 0; c < COL; c++){
+                board[r][c] = VACANT;
+            }
+        }
+        score = 0;
+        lines = 0;
+        speed = 800;
+        gameOver = false;
+        document.getElementById('score').innerText = score;
+        document.getElementById('lines').innerText = lines;
+        document.getElementById('game-over-screen').style.display = 'none';
+        
+        drawBoard();
+        p = randomPiece();
+        nextP = randomPiece();
+        drawNextPiece();
+        p.draw();
+        dropStart = Date.now();
+        drop();
+    }
+</script>
+
+</body>
+</html>
